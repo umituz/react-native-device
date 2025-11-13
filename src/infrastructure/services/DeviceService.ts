@@ -132,6 +132,7 @@ export class DeviceService {
    * WARNING: Use with caution - user privacy considerations!
    * Android: androidId (can be reset)
    * iOS: iosIdForVendor (changes on reinstall)
+   * Web: null (not supported)
    */
   static async getDeviceId(): Promise<string | null> {
     try {
@@ -143,10 +144,33 @@ export class DeviceService {
         return await Application.getIosIdForVendorAsync();
       }
 
+      // Web not supported - return null
       return null;
     } catch (error) {
       return null;
     }
+  }
+
+  /**
+   * Get offline user ID with fallback (iOS/Android only)
+   * 
+   * For offline apps that need a persistent user ID:
+   * 1. Try to get platform-specific device ID (iOS/Android)
+   * 2. Fallback to a default offline user ID if device ID not available
+   * 
+   * NOTE: Returns null for web platform (not supported)
+   */
+  static async getOfflineUserId(fallbackId: string = 'offline_user'): Promise<string | null> {
+    // Web not supported
+    if (Platform.OS === 'web') {
+      return null;
+    }
+
+    const deviceId = await DeviceService.getDeviceId();
+    if (deviceId) {
+      return `offline_${deviceId}`;
+    }
+    return fallbackId;
   }
 
   /**
