@@ -174,35 +174,6 @@ export class DeviceService {
   }
 
   /**
-   * Get user friendly device ID (e.g. "iPhone13-A8F2")
-   * 
-   * Useful for displaying a readable user identifier in profiles.
-   * Combines cleaned model name with short device hash.
-   */
-  static async getUserFriendlyId(): Promise<string> {
-    if (Platform.OS === 'web') {
-       return `WebUser-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    }
-
-    const [deviceInfo, deviceId] = await Promise.all([
-      DeviceService.getDeviceInfo(),
-      DeviceService.getDeviceId()
-    ]);
-
-    // Get model name and remove spaces/special chars
-    const model = deviceInfo.modelName || deviceInfo.deviceName || 'Device';
-    // Keep only alphanumeric, remove spaces
-    const cleanModel = model.replace(/[^a-zA-Z0-9]/g, '');
-    
-    // Get last 6 chars of device ID or generate random
-    const idPart = deviceId 
-      ? deviceId.substring(Math.max(0, deviceId.length - 6)).toUpperCase()
-      : Math.random().toString(36).substring(2, 8).toUpperCase();
-
-    return `${cleanModel}-${idPart}`;
-  }
-
-  /**
    * Check if device supports specific features
    */
   static async getDeviceCapabilities(): Promise<{
@@ -241,6 +212,40 @@ export class DeviceService {
       return false;
     } catch (error) {
       return false;
+    }
+  }
+
+  /**
+   * Get user friendly device ID (e.g. "iPhone13-A8F2")
+   *
+   * Useful for displaying a readable user identifier in profiles.
+   * Combines cleaned model name with short device hash.
+   */
+  static async getUserFriendlyId(): Promise<string> {
+    if (Platform.OS === 'web') {
+      return `WebUser-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    }
+
+    try {
+      const [deviceInfo, deviceId] = await Promise.all([
+        DeviceService.getDeviceInfo(),
+        DeviceService.getDeviceId()
+      ]);
+
+      // Get model name and remove spaces/special chars
+      const model = deviceInfo.modelName || deviceInfo.deviceName || 'Device';
+      // Keep only alphanumeric, remove spaces
+      const cleanModel = model.replace(/[^a-zA-Z0-9]/g, '');
+
+      // Get last 6 chars of device ID or generate random
+      const idPart = deviceId
+        ? deviceId.substring(Math.max(0, deviceId.length - 6)).toUpperCase()
+        : Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      return `${cleanModel}-${idPart}`;
+    } catch (error) {
+      // Fallback: Generate random ID
+      return `Device-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     }
   }
 }
