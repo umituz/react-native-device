@@ -19,34 +19,67 @@ import type { DeviceInfo, ApplicationInfo, SystemInfo } from '../../domain/entit
 export class DeviceService {
   /**
    * Get device information
+   * 
+   * SAFE: Returns minimal info if native modules are not ready
    */
   static async getDeviceInfo(): Promise<DeviceInfo> {
     try {
-      const totalMemory = await Device.getMaxMemoryAsync();
+      // Try to get memory with timeout
+      let totalMemory: number | null = null;
+      try {
+        totalMemory = await Promise.race([
+          Device.getMaxMemoryAsync(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000)),
+        ]).catch(() => null) as number | null;
+      } catch {
+        // Ignore memory errors
+      }
+
+      // Safely access Device properties (they might throw if native module not ready)
+      let brand: string | null = null;
+      let manufacturer: string | null = null;
+      let modelName: string | null = null;
+      let modelId: string | null = null;
+      let deviceName: string | null = null;
+      let deviceYearClass: number | null = null;
+      let deviceType: Device.DeviceType | null = null;
+      let isDevice: boolean = false;
+      let osName: string | null = null;
+      let osVersion: string | null = null;
+      let osBuildId: string | null = null;
+      let platformApiLevel: number | null = null;
+
+      try {
+        brand = Device.brand ?? null;
+        manufacturer = Device.manufacturer ?? null;
+        modelName = Device.modelName ?? null;
+        modelId = Device.modelId ?? null;
+        deviceName = Device.deviceName ?? null;
+        deviceYearClass = Device.deviceYearClass ?? null;
+        deviceType = Device.deviceType ?? null;
+        isDevice = Device.isDevice ?? false;
+        osName = Device.osName ?? null;
+        osVersion = Device.osVersion ?? null;
+        osBuildId = Device.osBuildId ?? null;
+        platformApiLevel = Device.platformApiLevel ?? null;
+      } catch {
+        // Native module not ready, use defaults
+      }
 
       return {
-        // Device identification
-        brand: Device.brand,
-        manufacturer: Device.manufacturer,
-        modelName: Device.modelName,
-        modelId: Device.modelId,
-        deviceName: Device.deviceName,
-        deviceYearClass: Device.deviceYearClass,
-
-        // Device type
-        deviceType: Device.deviceType,
-        isDevice: Device.isDevice,
-
-        // OS information
-        osName: Device.osName,
-        osVersion: Device.osVersion,
-        osBuildId: Device.osBuildId,
-        platformApiLevel: Device.platformApiLevel,
-
-        // Memory
+        brand,
+        manufacturer,
+        modelName,
+        modelId,
+        deviceName,
+        deviceYearClass,
+        deviceType,
+        isDevice,
+        osName,
+        osVersion,
+        osBuildId,
+        platformApiLevel,
         totalMemory,
-
-        // Platform
         platform: Platform.OS as 'ios' | 'android' | 'web',
       };
     } catch (error) {
@@ -133,15 +166,31 @@ export class DeviceService {
    * Android: androidId (can be reset)
    * iOS: iosIdForVendor (changes on reinstall)
    * Web: null (not supported)
+   * 
+   * SAFE: Returns null if native modules are not ready
    */
   static async getDeviceId(): Promise<string | null> {
     try {
       if (Platform.OS === 'android') {
-        return Application.getAndroidId();
+        try {
+          return await Promise.race([
+            Application.getAndroidId(),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000)),
+          ]).catch(() => null) as string | null;
+        } catch {
+          return null;
+        }
       }
 
       if (Platform.OS === 'ios') {
-        return await Application.getIosIdForVendorAsync();
+        try {
+          return await Promise.race([
+            Application.getIosIdForVendorAsync(),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000)),
+          ]).catch(() => null) as string | null;
+        } catch {
+          return null;
+        }
       }
 
       // Web not supported - return null
@@ -220,32 +269,51 @@ export class DeviceService {
    *
    * Useful for displaying a readable user identifier in profiles.
    * Combines cleaned model name with short device hash.
+   * 
+   * SAFE: This method has multiple fallback layers to prevent native module crashes.
+   * If native modules are not ready, it will return a safe fallback ID.
    */
   static async getUserFriendlyId(): Promise<string> {
+    // Web platform - no native modules needed
     if (Platform.OS === 'web') {
       return `WebUser-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     }
 
+    // Try to get device info with timeout and multiple fallbacks
     try {
-      const [deviceInfo, deviceId] = await Promise.all([
-        DeviceService.getDeviceInfo(),
-        DeviceService.getDeviceId()
-      ]);
+      // Add a timeout to prevent hanging if native modules are not ready
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Device info timeout')), 2000);
+      });
 
-      // Get model name and remove spaces/special chars
-      const model = deviceInfo.modelName || deviceInfo.deviceName || 'Device';
-      // Keep only alphanumeric, remove spaces
-      const cleanModel = model.replace(/[^a-zA-Z0-9]/g, '');
+      const deviceInfoPromise = DeviceService.getDeviceInfo().catch(() => null);
+      const deviceIdPromise = DeviceService.getDeviceId().catch(() => null);
 
-      // Get last 6 chars of device ID or generate random
-      const idPart = deviceId
-        ? deviceId.substring(Math.max(0, deviceId.length - 6)).toUpperCase()
-        : Math.random().toString(36).substring(2, 8).toUpperCase();
+      // Race between actual calls and timeout
+      const [deviceInfo, deviceId] = await Promise.race([
+        Promise.all([deviceInfoPromise, deviceIdPromise]),
+        timeoutPromise,
+      ]).catch(() => [null, null]) as [any, string | null];
 
-      return `${cleanModel}-${idPart}`;
+      // If we got device info, use it
+      if (deviceInfo && (deviceInfo.modelName || deviceInfo.deviceName)) {
+        const model = deviceInfo.modelName || deviceInfo.deviceName || 'Device';
+        const cleanModel = model.replace(/[^a-zA-Z0-9]/g, '');
+
+        const idPart = deviceId
+          ? deviceId.substring(Math.max(0, deviceId.length - 6)).toUpperCase()
+          : Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        return `${cleanModel}-${idPart}`;
+      }
+
+      // Fallback: Use platform + random ID
+      const platformPrefix = Platform.OS === 'ios' ? 'iOS' : Platform.OS === 'android' ? 'Android' : 'Device';
+      return `${platformPrefix}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     } catch (error) {
-      // Fallback: Generate random ID
-      return `Device-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      // Final fallback: Generate safe random ID
+      const platformPrefix = Platform.OS === 'ios' ? 'iOS' : Platform.OS === 'android' ? 'Android' : 'Device';
+      return `${platformPrefix}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     }
   }
 }
