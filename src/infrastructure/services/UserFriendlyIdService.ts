@@ -6,6 +6,7 @@
  */
 
 import { Platform } from 'react-native';
+import type { DeviceInfo } from '../../domain/entities/Device';
 import { DeviceInfoService } from './DeviceInfoService';
 import { DeviceIdService } from './DeviceIdService';
 import {
@@ -14,7 +15,6 @@ import {
   generateRandomId,
   getPlatformPrefix,
 } from '../utils/stringUtils';
-import { withTimeoutAll } from '../utils/nativeModuleUtils';
 
 /**
  * Service for generating user-friendly device IDs
@@ -36,14 +36,9 @@ export class UserFriendlyIdService {
     }
 
     try {
-      // Try to get device info and ID with timeout
-      const [deviceInfo, deviceId] = await withTimeoutAll(
-        [
-          () => DeviceInfoService.getDeviceInfo(),
-          () => DeviceIdService.getDeviceId(),
-        ],
-        2000,
-      );
+      // Try to get device info and ID
+      const deviceInfo: DeviceInfo = await DeviceInfoService.getDeviceInfo();
+      const deviceId: string | null = await DeviceIdService.getDeviceId();
 
       // If we got device info, use it
       if (deviceInfo && (deviceInfo.modelName || deviceInfo.deviceName)) {

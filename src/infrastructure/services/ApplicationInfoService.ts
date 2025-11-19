@@ -41,19 +41,21 @@ export class ApplicationInfoService {
       let iosIdForVendor: string | null = null;
 
       if (Platform.OS === 'android') {
-        androidId = await withTimeout(() => Application.getAndroidId(), 1000);
+        const result = await withTimeout(async () => Application.getAndroidId(), 1000);
+        androidId = result || null;
       }
 
       if (Platform.OS === 'ios') {
-        iosIdForVendor = await withTimeout(
-          () => Application.getIosIdForVendorAsync(),
+        const result = await withTimeout(
+          async () => Application.getIosIdForVendorAsync(),
           1000,
         );
+        iosIdForVendor = result || null;
       }
 
       return {
-        applicationName,
-        applicationId,
+        applicationName: applicationName || 'Unknown',
+        applicationId: applicationId || 'Unknown',
         nativeApplicationVersion,
         nativeBuildVersion,
         installTime,

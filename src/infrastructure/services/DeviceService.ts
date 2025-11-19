@@ -40,8 +40,10 @@ export class DeviceService {
 
   /**
    * Get complete system information (device + app)
+   * @param options - Optional configuration
+   * @param options.userId - Optional user ID to include in system info
    */
-  static async getSystemInfo(): Promise<SystemInfo> {
+  static async getSystemInfo(options?: { userId?: string }): Promise<SystemInfo> {
     const [device, application] = await Promise.all([
       DeviceInfoService.getDeviceInfo(),
       ApplicationInfoService.getApplicationInfo(),
@@ -51,6 +53,7 @@ export class DeviceService {
       device,
       application,
       timestamp: Date.now(),
+      ...(options?.userId && { userId: options.userId }),
     };
   }
 

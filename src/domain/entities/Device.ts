@@ -70,6 +70,7 @@ export interface SystemInfo {
   device: DeviceInfo;
   application: ApplicationInfo;
   timestamp: number;
+  userId?: string;
 }
 
 /**

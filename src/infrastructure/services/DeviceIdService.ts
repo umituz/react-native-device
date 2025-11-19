@@ -26,14 +26,16 @@ export class DeviceIdService {
   static async getDeviceId(): Promise<string | null> {
     try {
       if (Platform.OS === 'android') {
-        return await withTimeout(() => Application.getAndroidId(), 1000);
+        const result = await withTimeout(async () => Application.getAndroidId(), 1000);
+        return result || null;
       }
 
       if (Platform.OS === 'ios') {
-        return await withTimeout(
-          () => Application.getIosIdForVendorAsync(),
+        const result = await withTimeout(
+          async () => Application.getIosIdForVendorAsync(),
           1000,
         );
+        return result || null;
       }
 
       // Web not supported

@@ -94,7 +94,14 @@ import { DeviceService } from '@umituz/react-native-device';
 // Get device info once
 const deviceInfo = await DeviceService.getDeviceInfo();
 const appInfo = await DeviceService.getApplicationInfo();
+
+// Get system info (device + app)
 const systemInfo = await DeviceService.getSystemInfo();
+
+// Get system info with user ID (optional)
+const systemInfoWithUser = await DeviceService.getSystemInfo({ 
+  userId: 'user123' 
+});
 
 // Check capabilities
 const capabilities = await DeviceService.getDeviceCapabilities();
